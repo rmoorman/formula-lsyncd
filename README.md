@@ -22,9 +22,34 @@ salt 'minion' state.sls lsyncd
 
 ## Requirements
 
+**Passwordless SSH**  
 This formula requires the user running `lsyncd` to have passwordless SSH access configured to the client machine.
 The [Blunix GmbH SSH Formula](https://github.com/blunix/formula-ssh) can be used to set up a SSH keypair on the `lsyncd`
 machine, pushing the public key to the mine to then install it on the "client" machine.
+
+**Sysctl settings**  
+As `lsyncd` `inotifywatch`'es the `source` directory for changes. `/proc/sys/fs/inotify/max_user_watches` may have to be increased accordingly, which SaltStack can take care of by using our [Blunix GmbH Server Formula](https://github.com/blunix/formula-server), which includes options for setting sysctl settings. Increasing this may be required to prevent the message:
+```
+lsyncd: Error, Terminating since out of inotify watches.#012Consider increasing /proc/sys/fs/inotify/max_user_watches
+```
+
+You should set a number higher than the amount of subdirectories in the directory that is to be kept in sync, for example:
+```
+root@web0.example.com ~ # find /var/www -type d | wc -l | tail -n 1
+25410
+root@web1.example.com /var $ cat /proc/sys/fs/inotify/max_user_watches
+8192
+root@web1.example.com /var $ echo '8192 * 8' | bc
+65536
+root@web1.example.com /var $ echo 65536 > /proc/sys/fs/inotify/max_user_watches
+```
+
+in `/var/log/syslog`. The `lsyncd` status logfile `/var/log/lsyncd-status.log` will also give you this information:
+```
+root@web0.example.com ~ # cat /var/log/lsyncd-status.log | grep Inotify
+Inotify watching 25410 directories
+```
+
 
 ## Testing in Vagrant
 Run the following commands:
